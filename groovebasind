@@ -6,6 +6,7 @@ net = require 'net'
 socketio = require 'socket.io'
 static = require 'node-static'
 nconf = require 'nconf'
+Rdio = require './server/rdio'
 
 nconf
   .argv()
@@ -37,21 +38,27 @@ app = http.createServer((request, response) ->
 ).listen(nconf.get('http:port'))
 console.log "Attempting to serve http://localhost:#{nconf.get('http:port')}/"
 
+rdio = new (Rdio.Rdio) process.env.RDIO_API_KEY
+
+
 io = socketio.listen(app)
 io.set 'log level', nconf.get('log_level')
 io.sockets.on 'connection', (socket) ->
   mpd = net.connect nconf.get('mpd:port'), nconf.get('mpd:host'), ->
     console.log "mpd connect"
   mpd.on 'data', (data) ->
-    socket.emit 'FromMpd', data.toString()
+    socket.emit 'frommpd', data.toString()
   mpd.on 'end', ->
     console.log "mpd disconnect"
     try socket.emit 'disconnect'
   mpd.on 'error', ->
-    console.log "No mpd daemon found."
+    console.log 'No mpd daemon found.'
 
-  socket.on 'ToMpd', (data) ->
+  socket.on 'tompd', (data) ->
     console.log "[in] " + data
     try mpd.write data
 
   socket.on 'disconnect', -> mpd.end()
+
+  socket.on 'rdiosearch', (data) ->
+    rdio.search data, ->

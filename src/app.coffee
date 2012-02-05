@@ -136,15 +136,16 @@ setUpUi = ->
     file = $(event.target).data('file')
     mpd.queueFile file
     return false
-  
+
   $("#lib-filter").on 'keydown', (event) ->
     if event.keyCode == 27
       $(event.target).val("")
       mpd.search ""
       return false
-    else if event.keyCode == 13
-      mpd.search $(event.target).val()
-      return false
+
+  $("#search-form").submit (event) ->
+    mpd.search $(event.target).val()
+    return false
 
   actions =
     'toggle': ->
@@ -232,6 +233,7 @@ $(document).ready ->
   setUpUi()
   initHandlebars()
 
+
   mpd = new window.Mpd()
   mpd.onError (msg) -> alert msg
   mpd.onLibraryUpdate renderLibrary
@@ -240,6 +242,17 @@ $(document).ready ->
   mpd.onStatusUpdate ->
     renderNowPlaying()
     renderPlaylist()
+
+  window.WEB_SOCKET_SWF_LOCATION = "/public/vendor/socket.io/WebSocketMain.swf"
+  socket = io.connect(undefined, {'force new connection': true})
+  socket.on 'frommpd', mpd.handleData
+  socket.on 'connect', ->
+    mpd.updateArtistList()
+    mpd.updateStatus()
+    mpd.updatePlaylist()
+
+  mpd.onSendData (msg) ->
+    socket.emit 'tompd', msg
 
   render()
   handleResize()

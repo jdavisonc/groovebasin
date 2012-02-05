@@ -40,8 +40,6 @@
 # }
 # search_results structure mimics library structure
 
-######################### global #####################
-window.WEB_SOCKET_SWF_LOCATION = "/public/vendor/socket.io/WebSocketMain.swf"
 
 
 ######################### static #####################
@@ -106,8 +104,6 @@ pickNRandomProps = (obj, n) ->
 window.Mpd = class _
 
   ######################### private #####################
-
-
   createEventHandlers: =>
     registrarNames = [
       'onError'
@@ -115,7 +111,9 @@ window.Mpd = class _
       'onSearchResults'
       'onPlaylistUpdate'
       'onStatusUpdate'
+      'onSendData'
     ]
+
     @nameToHandlers = {}
     createEventRegistrar = (name) =>
       handlers = []
@@ -137,7 +135,7 @@ window.Mpd = class _
 
   send: (msg) =>
     @debugMsgConsole?.log "send: #{@msgHandlerQueue[@msgHandlerQueue.length - 1]?.debug_id ? -1}: " + JSON.stringify(msg)
-    @socket.emit 'ToMpd', msg + "\n"
+    @raiseEvent 'onSendData', msg + "\n"
 
 
   deleteTrack: (track) =>
@@ -295,10 +293,30 @@ window.Mpd = class _
       artists: []
       track_table: {}
 
+  handleData: (data) =>
+    @buffer += data
+
+    loop
+      m = @buffer.match(MPD_SENTINEL)
+      return if not m?
+
+      msg = @buffer.substring(0, m.index)
+      [line, code, str] = m
+      if code == "ACK"
+        @raiseEvent 'onError', str
+        # flush the handler
+        @handleMessage null
+      else if line.indexOf("OK MPD") == 0
+        # new connection, ignore
+      else
+        @handleMessage msg
+      @buffer = @buffer.substring(msg.length+line.length+1)
+
+
+
+
   ######################### public #####################
-  
   constructor: ->
-    @socket = io.connect(undefined, {'force new connection': true})
     @buffer = ""
     @msgHandlerQueue = []
     # assign to console to enable message passing debugging
@@ -308,32 +326,9 @@ window.Mpd = class _
     # whether we've sent the idle command to mpd
     @idling = false
 
-    @socket.on 'FromMpd', (data) =>
-      @buffer += data
-      
-      loop
-        m = @buffer.match(MPD_SENTINEL)
-        return if not m?
-
-        msg = @buffer.substring(0, m.index)
-        [line, code, str] = m
-        if code == "ACK"
-          @raiseEvent 'onError', str
-          # flush the handler
-          @handleMessage null
-        else if line.indexOf("OK MPD") == 0
-          # new connection, ignore
-        else
-          @handleMessage msg
-        @buffer = @buffer.substring(msg.length+line.length+1)
-    @socket.on 'connect', =>
-      @updateLibrary()
-      @updateStatus()
-      @updatePlaylist()
-
     @createEventHandlers()
     @haveFileListCache = false
-    
+
     # maps mpd subsystems to our function to call which will update ourself
     @updateFuncs =
       database: -> # the song database has been modified after update.
