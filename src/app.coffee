@@ -4,7 +4,8 @@ schedule = (delay, func) -> window.setInterval(func, delay)
 context =
   playing: -> this.status?.state == 'play'
 
-mpd = null
+mpd  = null
+rdio = null
 base_title = document.title
 userIsSeeking = false
 userIsVolumeSliding = false
@@ -145,6 +146,7 @@ setUpUi = ->
 
   $("#search-form").submit (event) ->
     mpd.search $(event.target).val()
+    rdio.search $(this).find('input').val()
     return false
 
   actions =
@@ -235,13 +237,8 @@ $(document).ready ->
 
 
   mpd = new window.Mpd()
-  mpd.onError (msg) -> alert msg
-  mpd.onLibraryUpdate renderLibrary
-  mpd.onSearchResults renderSearch
-  mpd.onPlaylistUpdate renderPlaylist
-  mpd.onStatusUpdate ->
-    renderNowPlaying()
-    renderPlaylist()
+  rdio = new window.RdioClient()
+
 
   window.WEB_SOCKET_SWF_LOCATION = "/public/vendor/socket.io/WebSocketMain.swf"
   socket = io.connect(undefined, {'force new connection': true})
@@ -251,8 +248,18 @@ $(document).ready ->
     mpd.updateStatus()
     mpd.updatePlaylist()
 
+  mpd.onError (msg) -> alert msg
+  mpd.onLibraryUpdate renderLibrary
+  mpd.onSearchResults renderSearch
+  mpd.onPlaylistUpdate renderPlaylist
+  mpd.onStatusUpdate ->
+    renderNowPlaying()
+    renderPlaylist()
   mpd.onSendData (msg) ->
     socket.emit 'tompd', msg
+
+  rdio.onSearch (query) ->
+    socket.emit 'rdiosearch', query
 
   render()
   handleResize()

@@ -6,7 +6,8 @@ net = require 'net'
 socketio = require 'socket.io'
 static = require 'node-static'
 nconf = require 'nconf'
-Rdio = require './server/rdio'
+url = require 'url'
+RdioServer = require './server/rdio_server'
 
 nconf
   .argv()
@@ -35,11 +36,26 @@ fileServer = new (static.Server) './public'
 app = http.createServer((request, response) ->
   request.addListener 'end', ->
     fileServer.serve request, response
+
+
+  path = url.parse(request.url).pathname
+  console.log "GET: #{path}"
+  if path == '/oauth/callback'
+    rdio_oauth_callback request, response
+    response.writeHead 302,
+      'Location': '/'
+    response.end()
+
 ).listen(nconf.get('http:port'))
 console.log "Attempting to serve http://localhost:#{nconf.get('http:port')}/"
 
-rdio = new (Rdio.Rdio) process.env.RDIO_API_KEY
+rdio_oauth_callback = (request, response) ->
+  parsed_url = url.parse request.url, true
+  rdio_server.oauth_callback parsed_url.query.oauth_verifier
 
+rdio_server = new (RdioServer.RdioServer) process.env.RDIO_API_KEY, process.env.RDIO_SHARED_KEY, "#{app.address().address}:#{app.address().port}"
+rdio_server.login (url) ->
+  console.log url
 
 io = socketio.listen(app)
 io.set 'log level', nconf.get('log_level')
@@ -60,5 +76,6 @@ io.sockets.on 'connection', (socket) ->
 
   socket.on 'disconnect', -> mpd.end()
 
-  socket.on 'rdiosearch', (data) ->
-    rdio.search data, ->
+  socket.on 'rdiosearch', (query) ->
+    console.log "rdiosearch: #{query}"
+    rdio_server.search query, ->

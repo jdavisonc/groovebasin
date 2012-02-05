@@ -20,6 +20,7 @@
         "nconf": ">=0.5.1",
         "iced-coffee-script": ">=1.2.0i",
         "uglify-js": ">=1.2.5",
-        "handlebars": ">=1.0.4beta"
+        "handlebars": ">=1.0.4beta",
+        "rdio": ">=1.0.1"
     }
 }
