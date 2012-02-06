@@ -9,27 +9,25 @@ class root.RdioServer
       rdio_api_shared: shared_key
       callback_url: "http://#{host}/oauth/callback"
 
-  login: (callback=->) ->
-    self = this
-    @rdio_api.getRequestToken (error, oauth_token, oauth_token_secret, results) ->
-      self.oauth_token = oauth_token
-      self.oauth_token_secret = oauth_token_secret
+  login: (callback=->) =>
+    @rdio_api.getRequestToken (error, oauth_token, oauth_token_secret, results) =>
+      @oauth_token = oauth_token
+      @oauth_token_secret = oauth_token_secret
       if error
         throw new Error error
       else
         callback "https://www.rdio.com/oauth/authorize?oauth_token=#{oauth_token}"
 
-  oauth_callback: (oauth_verifier, callback=->) ->
-    self = this
-    @rdio_api.getAccessToken @oauth_token, @oauth_token_secret, oauth_verifier, (error, oauth_access_token, oauth_access_token_secret, results) ->
-      self.oauth_access_token = oauth_access_token
-      self.oauth_access_token_secret = oauth_access_token_secret
+  oauth_callback: (oauth_verifier, callback=->) =>
+    @rdio_api.getAccessToken @oauth_token, @oauth_token_secret, oauth_verifier, (error, oauth_access_token, oauth_access_token_secret, results) =>
+      @oauth_access_token = oauth_access_token
+      @oauth_access_token_secret = oauth_access_token_secret
       callback()
 
-  search: (query, callback=->) ->
+  search: (query, callback=->) =>
     @rdio_api.api @oauth_access_token, @oauth_access_token_secret,
       method: 'search'
-      types: "Artist, Album, Track"
+      types: "Track"
       query: query
-      (error, data, response) ->
-        collback data
+      (error, data, response) =>
+        callback data

@@ -26,8 +26,12 @@ renderLibraryTree = (artists, empty_message) ->
   context.empty_library_message = if mpd.haveFileListCache then empty_message else "loading..."
   $("#library").html Handlebars.templates.library(context)
   handleResize()
-renderLibrary = -> renderLibraryTree mpd.library.artists, "Empty Library"
-renderSearch = -> renderLibraryTree mpd.search_results.artists, "No Results Found"
+
+renderLibrary = ->
+  renderLibraryTree mpd.library.artists, "Empty Library"
+renderSearch = ->
+  context.rdio_artists = rdio.search_results.artist_list
+  renderLibraryTree mpd.search_results.artists, "No Results Found"
 
 updateSliderPos = ->
   return if userIsSeeking
@@ -115,10 +119,11 @@ setUpUi = ->
     return false
 
   $library = $("#library")
+
   $library.on 'click', 'div.track', (event) ->
     mpd.queueFileNext $(this).data('file')
 
-  $library.on 'click', 'div.expandable', (event) ->
+  $library.on 'click', '#library-items div.expandable', (event) ->
     $div = $(this)
     $ul = $div.parent().find("> ul")
     $ul.toggle()
@@ -128,6 +133,7 @@ setUpUi = ->
     [new_class, old_class] = [old_class, new_class] if $ul.is(":visible")
     $div.find("div").removeClass(old_class).addClass(new_class)
     return false
+
   $library.on 'mouseover', 'div.hoverable', (event) ->
     $(this).addClass "ui-state-active"
   $library.on 'mouseout', 'div.hoverable', (event) ->
@@ -137,6 +143,10 @@ setUpUi = ->
     file = $(event.target).data('file')
     mpd.queueFile file
     return false
+
+  # $rdio = $('#rdio-items')
+  # $rdio.on 'click', 'div.artist', (event) ->
+  #   $div = $(this)
 
   $("#lib-filter").on 'keydown', (event) ->
     if event.keyCode == 27
@@ -227,7 +237,7 @@ handleResize = ->
 
   # make the inside containers fit
   $lib_header = $lib.find(".window-header")
-  $("#library-items").height $lib.height() - $lib_header.position().top - $lib_header.height() - MARGIN
+  $("#library").height $lib.height() - $lib_header.position().top - $lib_header.height() - MARGIN
   $pl_header = $pl_window.find(".window-header")
   $("#playlist-items").height $pl_window.height() - $pl_header.position().top - $pl_header.height() - MARGIN
 
@@ -239,7 +249,6 @@ $(document).ready ->
   mpd = new window.Mpd()
   rdio = new window.RdioClient()
 
-
   window.WEB_SOCKET_SWF_LOCATION = "/public/vendor/socket.io/WebSocketMain.swf"
   socket = io.connect(undefined, {'force new connection': true})
   socket.on 'frommpd', mpd.handleData
@@ -247,6 +256,8 @@ $(document).ready ->
     mpd.updateArtistList()
     mpd.updateStatus()
     mpd.updatePlaylist()
+  socket.on 'rdiosearchresults', (data) ->
+    rdio.handleSearchResults data
 
   mpd.onError (msg) -> alert msg
   mpd.onLibraryUpdate renderLibrary
@@ -260,6 +271,7 @@ $(document).ready ->
 
   rdio.onSearch (query) ->
     socket.emit 'rdiosearch', query
+  rdio.onSearchResults renderSearch
 
   render()
   handleResize()

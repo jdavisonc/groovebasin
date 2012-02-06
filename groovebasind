@@ -78,4 +78,5 @@ io.sockets.on 'connection', (socket) ->
 
   socket.on 'rdiosearch', (query) ->
     console.log "rdiosearch: #{query}"
-    rdio_server.search query, ->
+    rdio_server.search query, (search_results) ->
+      socket.emit 'rdiosearchresults', search_results.toString()
