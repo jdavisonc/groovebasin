@@ -18,10 +18,15 @@ window.RdioClient = class RdioClient
     for result in results
       artists[result.artist] ||= {name: result.artist, albums: {}}
       artists[result.artist]['albums'][result.album] ||= {name: result.album, tracks: {}}
-      artists[result.artist]['albums'][result.album]['tracks'][result.url] = {name: result.name, track: result.trackNum, time: result.duration, url: result.url}
+      artists[result.artist]['albums'][result.album]['tracks'][result.url] = {name: result.name, track: result.trackNum, time: result.duration, key: result.key}
 
     @search_results.artist_list = (artist for artist_name, artist of artists)
     @search_results_callback()
 
+  onPlay: (@play_callback=->) ->
   onSearch: (@search_callback=->) ->
   onSearchResults: (@search_results_callback=->) ->
+
+  play: (key) ->
+    @browser
+    @play_callback key

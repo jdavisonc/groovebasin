@@ -120,9 +120,6 @@ setUpUi = ->
 
   $library = $("#library")
 
-  $library.on 'click', 'div.track', (event) ->
-    mpd.queueFileNext $(this).data('file')
-
   $library.on 'click', '#library-items div.expandable', (event) ->
     $div = $(this)
     $ul = $div.parent().find("> ul")
@@ -139,14 +136,15 @@ setUpUi = ->
   $library.on 'mouseout', 'div.hoverable', (event) ->
     $(this).removeClass "ui-state-active"
 
-  $library.on 'click', 'li.track', (event) ->
+  $library.on 'click', '#library-items li.track', (event) ->
     file = $(event.target).data('file')
     mpd.queueFile file
     return false
 
-  # $rdio = $('#rdio-items')
-  # $rdio.on 'click', 'div.artist', (event) ->
-  #   $div = $(this)
+  $library.on 'click', '#rdio-items div.track', (event) ->
+    $div = $(this)
+    mpd.stop()
+    rdio.play $div.attr 'data-key'
 
   $("#lib-filter").on 'keydown', (event) ->
     if event.keyCode == 27
@@ -271,6 +269,9 @@ $(document).ready ->
 
   rdio.onSearch (query) ->
     socket.emit 'rdiosearch', query
+  rdio.onPlay (key) ->
+    console.log 'emitting rdioplay'
+    socket.emit 'rdioplay', key
   rdio.onSearchResults renderSearch
 
   render()

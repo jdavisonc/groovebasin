@@ -24,6 +24,11 @@ nconf
       host: 'localhost'
       port: 6600
       conf: "/etc/mpd.conf"
+    rdio:
+      api_key: ''
+      shared_key: ''
+      oauth_access_token: ''
+      oauth_access_token_secret: ''
 
 # check for library link
 public_dir = "./public"
@@ -34,9 +39,6 @@ fs.readdir library_link, (err, files) ->
 # static server
 fileServer = new (static.Server) './public'
 app = http.createServer((request, response) ->
-  request.addListener 'end', ->
-    fileServer.serve request, response
-
 
   path = url.parse(request.url).pathname
   console.log "GET: #{path}"
@@ -45,6 +47,9 @@ app = http.createServer((request, response) ->
     response.writeHead 302,
       'Location': '/'
     response.end()
+  else
+    request.addListener 'end', ->
+      fileServer.serve request, response
 
 ).listen(nconf.get('http:port'))
 console.log "Attempting to serve http://localhost:#{nconf.get('http:port')}/"
@@ -53,9 +58,23 @@ rdio_oauth_callback = (request, response) ->
   parsed_url = url.parse request.url, true
   rdio_server.oauth_callback parsed_url.query.oauth_verifier
 
-rdio_server = new (RdioServer.RdioServer) process.env.RDIO_API_KEY, process.env.RDIO_SHARED_KEY, "#{app.address().address}:#{app.address().port}"
+rdio_server = new (RdioServer.RdioServer)(
+  nconf.get 'rdio:oauth_access_token'
+  nconf.get 'rdio:oauth_access_token_secret'
+  nconf.get 'rdio:api_key'
+  nconf.get 'rdio:shared_key'
+  "#{app.address().address}:#{app.address().port}"
+)
+
 rdio_server.login (url) ->
   console.log url
+
+rdio_server.on 'configchange', ->
+  nconf.set 'rdio:oauth_access_token',        rdio_server.oauth_access_token
+  nconf.set 'rdio:oauth_access_token_secret', rdio_server.oauth_access_token_secret
+  nconf.save (error) -> console.log "error: #{error}" if error
+
+rdio_socket = null
 
 io = socketio.listen(app)
 io.set 'log level', nconf.get('log_level')
@@ -77,6 +96,16 @@ io.sockets.on 'connection', (socket) ->
   socket.on 'disconnect', -> mpd.end()
 
   socket.on 'rdiosearch', (query) ->
-    console.log "rdiosearch: #{query}"
     rdio_server.search query, (search_results) ->
       socket.emit 'rdiosearchresults', search_results.toString()
+
+  socket.on 'rdioplay', (key) ->
+    console.log "rdioplay: #{key}"
+    console.log rdio_socket
+    rdio_socket?.emit 'rdioframeplay', key
+
+  socket.on 'rdioframeinitialize', (frame_url) ->
+    rdio_socket = socket
+    domain = url.parse(frame_url).hostname
+    rdio_server.get_playback_token domain, (playback_token) ->
+      socket.emit 'rdioframeactivate', playback_token
