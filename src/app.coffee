@@ -136,8 +136,8 @@ setUpUi = ->
   $library.on 'mouseout', 'div.hoverable', (event) ->
     $(this).removeClass "ui-state-active"
 
-  $library.on 'click', '#library-items li.track', (event) ->
-    file = $(event.target).data('file')
+  $library.on 'click', '#library-items div.track', (event) ->
+    file = $(this).data('file')
     mpd.queueFile file
     return false
 

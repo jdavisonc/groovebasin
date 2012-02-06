@@ -6,6 +6,7 @@ $(document).ready ->
   $console.empty()
   $console.log = (string) ->
     $console.append "#{string}\n"
+    $("html,body").animate {scrollTop: $(document).height()}, 'fast'
 
   socket.on 'rdioframeactivate', (playback_token) ->
     $console.log "playback token: #{playback_token}"

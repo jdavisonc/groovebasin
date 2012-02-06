@@ -11,7 +11,7 @@ class root.RdioServer extends EventEmitter
       rdio_api_key: api_key
       rdio_api_shared: shared_key
       callback_url: "http://#{host}/oauth/callback"
-    exec "firefox 'http://#{host}/rdio.html'"
+    exec "google-chrome 'http://#{host}/rdio.html'"
 
   login: (callback=->) =>
     return if @oauth_token_secret and @oauth_token_secret

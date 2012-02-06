@@ -48,7 +48,10 @@
     $console = $('#console');
     $console.empty();
     $console.log = function(string) {
-      return $console.append("" + string + "\n");
+      $console.append("" + string + "\n");
+      return $("html,body").animate({
+        scrollTop: $(document).height()
+      }, 'fast');
     };
     socket.on('rdioframeactivate', function(playback_token) {
       $console.log("playback token: " + playback_token);
