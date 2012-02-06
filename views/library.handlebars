@@ -31,33 +31,34 @@
 {{else}}
   {{empty_library_message}}
 {{/if}}
+
 {{#if rdio_artists}}
   <hr />
   <ul id="rdio-items" class="library-item-list">
     {{#rdio_artists}}
       <li>
         <div class="artist hoverable expandable">
-          <div class="ui-icon ui-icon-triangle-1-e"></div>
+          <div class="ui-icon ui-icon-triangle-1-se"></div>
           <span>{{name}}</span>
         </div>
         <ul>
-          {{#hash albums}}
+          {{#albums}}
             <li>
               <div class="album hoverable expandable">
-                <div class="ui-icon ui-icon-triangle-1-e"></div>
+                <div class="ui-icon ui-icon-triangle-1-se"></div>
                 <span>{{name}}</span>
               </div>
               <ul>
-                {{#hash tracks orderby="track,name"}}
+                {{#tracks}}
                   <li>
                     <div class="track hoverable" data-key="{{key}}">
                       <span>{{#if track}}{{track}}. {{/if}}{{name}}</span>
                     </div>
                   </li>
-                {{/hash}}
+                {{/tracks}}
               </ul>
             </li>
-          {{/hash}}
+          {{/albums}}
         </ul>
       </li>
     {{/rdio_artists}}

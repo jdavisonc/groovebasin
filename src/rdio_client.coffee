@@ -20,7 +20,14 @@ window.RdioClient = class RdioClient
       artists[result.artist]['albums'][result.album] ||= {name: result.album, tracks: {}}
       artists[result.artist]['albums'][result.album]['tracks'][result.url] = {name: result.name, track: result.trackNum, time: result.duration, key: result.key}
 
-    @search_results.artist_list = (artist for artist_name, artist of artists)
+    for k, artist of artists
+      for k, album of artist.albums
+        album.tracks = (track for k, track of album.tracks)
+      artist.albums = (album for k, album of artist.albums)
+    artists = (artist for k,artist of artists)
+
+
+    @search_results.artists = artists
     @search_results_callback()
 
   onPlay: (@play_callback=->) ->

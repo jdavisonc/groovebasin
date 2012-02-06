@@ -30,7 +30,7 @@ renderLibraryTree = (artists, empty_message) ->
 renderLibrary = ->
   renderLibraryTree mpd.library.artists, "Empty Library"
 renderSearch = ->
-  context.rdio_artists = rdio.search_results.artist_list
+  context.rdio_artists = rdio.search_results.artists
   renderLibraryTree mpd.search_results.artists, "No Results Found"
 
 updateSliderPos = ->
@@ -251,7 +251,7 @@ $(document).ready ->
   socket = io.connect(undefined, {'force new connection': true})
   socket.on 'frommpd', mpd.handleData
   socket.on 'connect', ->
-    mpd.updateArtistList()
+    mpd.updateLibrary()
     mpd.updateStatus()
     mpd.updatePlaylist()
   socket.on 'rdiosearchresults', (data) ->
