@@ -9,7 +9,10 @@ const
   mkdirp = require 'mkdirp'
   Mpd = require '../mpd.js/lib/mpd'
   async = require 'async'
+  which = require 'which'
   MpdConf = require('./mpdconf')
+  Killer = require('./killer')
+  spawn = require('child_process').spawn
   {EventEmitter} = require('events')
   
 process.env.NODE_ENV ||= "dev"
@@ -21,19 +24,19 @@ const
   MPD_SOCKET_PATH = path.join(RUN_DIR, "mpd.socket")
   STATE_FILE = path.join(RUN_DIR, "state.json")
   MPD_CONF_PATH = path.join(RUN_DIR, "mpd.conf")
+  MPD_PID_FILE = path.join(RUN_DIR, "mpd.pid")
 
-mkdirp.sync(RUN_DIR)
 
-app = express()
-app.configure !->
-  app.use(express.static(path.join(__dirname, '../public')))
-  app.use(express.static(path.join(__dirname, '../src/public')))
-  app.disable('x-powered-by')
-
-app_server = http.createServer(app)
-
-io = socketio.listen(app_server)
-io.set 'log level', 2
+mpd_conf = MpdConf() # default
+mpd_conf.setRunDir(RUN_DIR)
+root_pass = null
+accounts = null
+default_account = null
+my_mpd = null
+my_mpd_socket = null
+connect_success = true
+state = null
+io = null
 
 plugins =
   objects: {}
@@ -53,30 +56,43 @@ plugins =
   featuresList: ->
     ([name, plugin.is_enabled] for name, plugin in @objects)
 
-# default
-mpd_conf = MpdConf()
 
-const STATE_VERSION = 2 # increment this when layout of state object changes
-state =
-  state_version: STATE_VERSION
-  mpd_path: try require('which').sync('mpd')
-  status: {} # this structure is visible to clients
-  mpd_conf: mpd_conf.state
+!function makeRunDir (cb)
+  mkdirp(RUN_DIR, cb)
 
-root_pass = null
-accounts = null
-default_account = null
-my_mpd = null
-my_mpd_socket = null
-connect_success = true
+const STATE_VERSION = 3 # increment this when layout of state object changes
+!function initState (cb)
+  which 'mpd', !(err, mpd_exe) ->
+    # it's ok if we can't find the mpd binary right now.
+    if err then console.warn "Unable to find mpd binary in path: #{err.stack}"
+
+    state :=
+      state_version: STATE_VERSION
+      mpd_exe_path: mpd_exe
+      status: {} # this structure is visible to clients
+      mpd_conf: mpd_conf.state
+    cb()
 
 async.series [
+  initState
+  makeRunDir
   plugins~initialize
   restoreState
   writeMpdConf
-  maybeStartMpd
 ], !(err) ->
   assert.ifError(err)
+
+  app = express()
+  app.configure !->
+    app.use(express.static(path.join(__dirname, '../public')))
+    app.use(express.static(path.join(__dirname, '../src/public')))
+    app.disable('x-powered-by')
+
+  app_server = http.createServer(app)
+
+  io := socketio.listen(app_server)
+  io.set 'log level', 2
+  io.sockets.on 'connection', onSocketIoConnection
 
   plugins.bus.emit \app, app
   plugins.bus.emit \save_state, state
@@ -87,15 +103,16 @@ async.series [
     else
       console.warn "#{name} is disabled."
 
-  io.sockets.on 'connection', onSocketIoConnection
-
-  connectServerMpd()
-
-  process.on 'message', onProcessMessage
-
   app_server.listen PORT, HOST, !->
     process.send 'online'
     console.info "Listening at http://#HOST:#PORT"
+
+  process.on 'message', onProcessMessage
+
+  connectServerMpd()
+
+  restartMpd !(err) ->
+    if err then console.error "Unable to restart mpd: #{err}"
 
 function oncePerEventLoopFunc (fn)
   queued = false
@@ -190,6 +207,34 @@ function createMpdConnection (unix_socket)
     socket.emit 'Permissions', JSON.stringify(permissions)
     socket.emit 'PasswordResult', JSON.stringify(success)
 
+!function restartMpd (cb)
+  mkdirp mpd_conf.playlistDirectory(), !(err) ->
+    return cb(err) if err
+    fs.readFile MPD_PID_FILE, 'utf8', !(err, pid_str) ->
+      if err
+        if err?code is \ENOENT
+          startMpd(cb)
+        else
+          cb(err)
+      else
+        # need to kill mpd
+        console.info "killing mpd", state.mpd_exe_path
+        pid = parseInt(pid_str, 10)
+        killer = Killer(pid)
+        killer.on \error, !(err) -> cb(err)
+        killer.on \end, !-> startMpd(cb)
+
+!function startMpd(cb)
+  console.info "starting mpd", state.mpd_exe_path
+  child = spawn state.mpd_exe_path, [
+    '--no-daemon'
+    MPD_CONF_PATH
+  ], {
+    stdio: 'ignore'
+    detached: true
+  }
+  child.unref()
+  cb()
 
 !function connectServerMpd
   my_mpd_socket := createMpdConnection true

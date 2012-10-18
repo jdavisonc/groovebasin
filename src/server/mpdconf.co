@@ -1,4 +1,6 @@
 const
+  path = require('path')
+
   ALL_PERMISSIONS =
     read: true
     add: true
@@ -17,46 +19,50 @@ module.exports = class MpdConf
   (@state) ~>
     if @state!? then @setDefaultState()
 
-  setDefaultState: ->
+  setDefaultState: !->
     @state = {}
     @state.admin_password = Math.floor(Math.random() * 99999999999)
     @state.permissions = "#{@state.admin_password}": ALL_PERMISSIONS
 
     @state.audio_httpd =
-      encoding: \ogg
-      bitrate: \mp3
+      format: \ogg
+      quality: 6
       port: 16243
     @state.audio_pulse = null
     @state.audio_alsa = null
     @state.audio_oss = null
 
-    @state.music_directory = "~/music"
-    @state.run_dir = "run"
+    @state.run_dir = null
+    @state.music_directory = null
     @state.port = 16244
     @state.default_permissions = DEFAULT_PERMISSIONS
 
   accountHasPerm: (passwd, perm) -> !!@state.permissions[passwd][perm]
 
+  playlistDirectory: -> path.join(@state.run_dir, "playlists")
+
+  setRunDir: !-> @state.run_dir = it
+
   toMpdConf: ->
     accounts = ""
     for password, perms in @state.permissions
-      accounts += "#{password}@#{permsToList(perms)}\n"
+      accounts += "password \"#{password}@#{permsToList(perms)}\"\n"
 
     audio_outputs = ""
     if @state.audio_httpd?
-      quality = if @state.audio_httpd.encoding is \mp3
-        "quality #{@state.audio_httpd.quality}"
-      else
-        ""
-      bitrate = if @state.audio_httpd.encoding is \ogg
-        "bitrate #{@state.audio_httpd.bitrate}"
-      else
-        ""
+      if @state.audio_httpd.format is \ogg
+        quality = "quality \"#{@state.audio_httpd.quality}\""
+        bitrate = ""
+        encoder_value = "vorbis"
+      else if @state.audio_httpd.format is \mp3
+        quality = ""
+        bitrate = "bitrate \"#{@state.audio_httpd.bitrate}\""
+        encoder_value = "lame"
       audio_outputs += """
         audio_output {
           type            "httpd"
           name            "Groove Basin"
-          encoder         "vorbis"
+          encoder         "#encoder_value"
           port            "#{@state.audio_httpd.port}"
           bind_to_address "0.0.0.0"
           #quality
@@ -96,9 +102,10 @@ module.exports = class MpdConf
 
     """
     music_directory         "#{@state.music_directory}"
-    playlist_directory      "#{@state.run_dir}/playlists"
+    playlist_directory      "#{@playlistDirectory()}"
     db_file                 "#{@state.run_dir}/mpd.music.db"
     log_file                "#{@state.run_dir}/mpd.log"
+    pid_file                "#{@state.run_dir}/mpd.pid"
     state_file              "#{@state.run_dir}/mpd.state"
     sticker_file            "#{@state.run_dir}/mpd.sticker.db"
     bind_to_address         "localhost"

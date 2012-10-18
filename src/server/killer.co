@@ -1,0 +1,21 @@
+POLL_INTERVAL = 100
+
+module.exports = class Killer extends require('events').EventEmitter
+  (@pid) ~>
+
+  kill: !->
+    @interval = setInterval(@~check, POLL_INTERVAL)
+
+  check: !->
+    try
+      process.kill(@pid)
+    catch e
+      @clean()
+      if e.code is \ESRCH
+        @emit 'end'
+      else
+        @emit 'error', e
+
+  clean: !->
+    clearInterval(@interval) if @interval?
+    @interval = null
